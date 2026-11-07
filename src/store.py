@@ -43,6 +43,8 @@ class Store:
                     amount_usd REAL,
                     status TEXT NOT NULL,
                     recorded_at TEXT NOT NULL,
+                    order_id TEXT,
+                    lines_json TEXT,
                     UNIQUE(run_id, action)
                 );
                 CREATE TABLE IF NOT EXISTS decisions (
@@ -53,6 +55,14 @@ class Store:
                 );
                 """
             )
+            columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(ledger)").fetchall()
+            }
+            if "order_id" not in columns:
+                connection.execute("ALTER TABLE ledger ADD COLUMN order_id TEXT")
+            if "lines_json" not in columns:
+                connection.execute("ALTER TABLE ledger ADD COLUMN lines_json TEXT")
 
     def find_by_fingerprint(self, fingerprint: str) -> Optional[Dict[str, Any]]:
         if not fingerprint:
@@ -101,13 +111,50 @@ class Store:
         amount_usd: Optional[float],
         status: str,
         recorded_at: str,
+        order_id: Optional[str] = None,
+        lines: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         with self._lock, self._connect() as connection:
             connection.execute(
-                "INSERT OR IGNORE INTO ledger(run_id, ticket_id, action, amount_usd, status, recorded_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (run_id, ticket_id, action, amount_usd, status, recorded_at),
+                "INSERT OR IGNORE INTO ledger("
+                "run_id, ticket_id, action, amount_usd, status, recorded_at, order_id, lines_json"
+                ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    run_id,
+                    ticket_id,
+                    action,
+                    amount_usd,
+                    status,
+                    recorded_at,
+                    order_id,
+                    json.dumps(lines or [], default=str),
+                ),
             )
+
+    def active_refund_lines(self, order_id: str) -> Dict[str, str]:
+        """Map order line_no -> run_id for PROPOSED/APPROVED REFUND ledger entries."""
+        if not order_id:
+            return {}
+        with self._lock, self._connect() as connection:
+            rows = connection.execute(
+                "SELECT run_id, order_id, lines_json FROM ledger "
+                "WHERE action = 'REFUND' AND status IN ('PROPOSED', 'APPROVED') "
+                "ORDER BY id"
+            ).fetchall()
+        active: Dict[str, str] = {}
+        for row in rows:
+            try:
+                lines = json.loads(row["lines_json"] or "[]")
+            except (TypeError, ValueError):
+                continue
+            for line in lines:
+                line_order = line.get("order_id") or row["order_id"]
+                if line_order != order_id:
+                    continue
+                line_no = str(line.get("line_no"))
+                if line_no and line_no not in active:
+                    active[line_no] = row["run_id"]
+        return active
 
     def set_ledger_status(self, run_id: str, status: str) -> None:
         with self._lock, self._connect() as connection:

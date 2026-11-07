@@ -17,13 +17,13 @@ RP-3.2 v3.2 only. FAQ v2 is tone-only and superseded; WH-PICK-1.4 is internal an
 
 - First real run `eval/results_20261107T124551Z.json`: 22/23 (95.65%). N08 failed: carrier says DELIVERED but the customer claims non-delivery; the engine returned `REJECT` on the window instead of `UNABLE_TO_VERIFY`.
 - Change: added the delivery-status-vs-claim guard in `src/policy.py` (a delivered scan contradicting a pure non-delivery claim cannot establish receipt).
-- Second run `eval/results_20261107T124735Z.json`: 23/23 (100%). New negatives cover 8 cases and more than 3 kinds.
+- Expanded run `eval/results_20261107T160411Z.json`: 28/28 (100%) after the reported regression fixes. New negatives cover 13 cases and more than 3 kinds. Extra checks cover approve/reject clearing `human_approval_required`, ledger-based duplicate suppression (T027/T028, plain copy, `>`-quoted copy), same-line suppression and PEND ledger behaviour. Three copies of the same lamp produce one refund because the line already has a PROPOSED REFUND.
 
 ## Cost and latency (3 lines)
 
 - Latency: wall-clock around extract + decide + reply in `process_ticket`, stored as `latency_ms`.
 - Cost: OpenAI `usage` token counts x the per-1M list-price table in `src/trace.py`.
-- Median over 23 offline cases: 0.1 ms latency and $0.00 cost (no LLM key, 0 tokens); deployed `gpt-4o-mini` runs use real token counts.
+- Median over 28 offline cases: 0.1 ms latency and $0.00 cost (no LLM key, 0 tokens); deployed `gpt-4o-mini` runs use real token counts.
 
 ## What is not built
 

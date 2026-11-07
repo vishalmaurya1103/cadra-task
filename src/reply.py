@@ -36,7 +36,17 @@ def build_reply(
     index: Dict[str, Any],
 ) -> Dict[str, str]:
     sender = norm_email(ticket.get("from") or ticket.get("from_"))
-    order_id = (decision.get("resolved") or {}).get("order_id") or "your order"
+    order_ids = decision.get("_order_ids") or []
+    if not order_ids:
+        resolved_order = (decision.get("resolved") or {}).get("order_id")
+        order_ids = [resolved_order] if resolved_order else []
+    order_id = ", ".join(order_ids) if order_ids else "your order"
+    unmatched_orders = [
+        str(entry.get("order_id"))
+        for entry in (decision.get("resolved_orders") or [])
+        if not entry.get("matched") and entry.get("order_id")
+    ]
+    requested_amount = decision.get("_requested_amount")
     outcome = decision.get("outcome")
     reasons = decision.get("reason_codes") or []
     amount = decision.get("amount_usd")
@@ -123,6 +133,13 @@ def build_reply(
             notes += f" We have excluded {_money(prior_total)} that was already refunded on this order."
         if decision.get("asks_shipping"):
             notes += " Shipping charges are not included in an order-line refund."
+        if requested_amount and amount and float(requested_amount) > float(amount) + 0.01:
+            notes += (
+                f" You asked for {_money(requested_amount)}; the order-line value is "
+                f"{_money(amount)}, so the proposal is limited to that value."
+            )
+        if unmatched_orders:
+            notes += f" We could not match order(s) {', '.join(unmatched_orders)} to this email address."
         body = (
             f"Hello,\n\nWe reviewed order {order_id}. We have proposed a refund of {_money(amount)} "
             f"for {_items_text(items)}.{notes} Because the proposed amount is above $150, it needs "
@@ -139,6 +156,15 @@ def build_reply(
             )
         if decision.get("asks_shipping"):
             explanation += " Shipping charges are not included in an order-line refund."
+        if requested_amount and amount and float(requested_amount) > float(amount) + 0.01:
+            explanation += (
+                f" You asked for {_money(requested_amount)}; the order-line value is "
+                f"{_money(amount)}, so the refund is limited to that value."
+            )
+        if unmatched_orders:
+            explanation += (
+                f" We could not match order(s) {', '.join(unmatched_orders)} to this email address."
+            )
         body = (
             f"Hello,\n\nWe reviewed order {order_id} and can refund {_money(amount)} for "
             f"{_items_text(items)}.{explanation} The refund will be proposed for processing; you "

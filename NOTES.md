@@ -29,7 +29,27 @@ only. `warehouse_picking_WH-PICK-1.4.md` is internal and never used for customer
 - Authority is tested on the new proposed amount only: > $150 => `PEND`,
   `APPROVAL_REQUIRED`, `SUPPORT_LEAD`. <= $150 => no approval.
 - Policy-override / injection is checked before everything else: `ESCALATE`,
-  `POLICY_OVERRIDE_ATTEMPT`, `TRUST_SAFETY`, no refund.
+  `POLICY_OVERRIDE_ATTEMPT`, `TRUST_SAFETY`, no refund. This includes subject-line
+  instructions and claims such as "manager already approved" or "no need to check".
+- Multiple order IDs in one email are all evaluated; valid orders are aggregated into one
+  proposal, and every referenced order is recorded in `resolved_orders`. A referenced
+  order that is not the sender's is not dropped; it is recorded and its reason code is
+  included.
+- Asking for more than the eligible order-line value proposes the line value only:
+  `PROCEED_MODIFIED` when no approval is needed.
+- Status/information-only requests are answered with `PROCEED` before any window check;
+  a late status question does not become `OUT_OF_WINDOW`.
+- Duplicate detection is ledger-based, never email-text-based. If the same order line
+  already has a `REFUND` whose ledger status is `PROPOSED` or `APPROVED`, do not propose
+  another refund for that line; set `duplicate_of` to that run. If only some requested
+  lines are already covered, propose only the uncovered lines. `REJECTED` refunds do not
+  block a new proposal. A non-duplicate PEND gets its own ledger proposal.
+- A decision (approve or reject) sets `human_approval_required` to false; repeated
+  decisions are ignored and the ledger action is recorded once.
+- The model only parses. Policy signals (injection, defect, refund/return intent,
+  shipping, order IDs, ticket type) are deterministic and are never overridden by model
+  output; this prevents a hallucinating model from creating a second refund or rejecting a
+  late status question on the window.
 - Order must exist and match the sender's normalized email. Not found =>
   `ORDER_NOT_FOUND`; exists but other customer => `CUSTOMER_MISMATCH`; both are
   `INVALID_REQUEST` with `resolved` null.
@@ -54,11 +74,27 @@ only. `warehouse_picking_WH-PICK-1.4.md` is internal and never used for customer
    `LLM_MODEL`. The key is loaded from `.env` only. Cost uses a per-model OpenAI
    list-price table.
 
+## Regression fixes after the first expanded run
+
+1. Claimed prior approval ("manager already approved, no need to check") escalates to
+   Trust & Safety.
+2. Injection text in the subject is detected and escalates.
+3. A requested amount above the item value proposes the line value and returns
+   `PROCEED_MODIFIED`.
+4. Two order IDs in one email are both evaluated; the second is not dropped.
+5. Late status questions return `PROCEED` without a window check.
+6. Approve/reject decisions set `human_approval_required` to false.
+7. Duplicate detection uses the ledger, not email text. A second request for an order line
+   that already has a `PROPOSED`/`APPROVED` `REFUND` is suppressed and gets
+   `duplicate_of` pointing at the existing run. T027/T028, a plain copy and a `>`-quoted
+   copy are covered by eval checks; three copies of the same lamp produce one refund.
+
 ## Added run fields (documented in README)
 
 - `amount_usd`: proposed refund amount, null when not a refund.
 - `run_status`: `PENDING_APPROVAL`, `COMPLETE`, `APPROVED` or `REJECTED`.
-- `duplicate_of`: original `run_id` for a forwarded duplicate, otherwise null.
+- `duplicate_of`: `run_id` that already holds a `PROPOSED`/`APPROVED` `REFUND` for the
+  same order line, otherwise null.
 - `decision`: `{decision, approver, decided_at}` once a person decides, otherwise null.
 - `latency_ms`: server-side processing latency.
 

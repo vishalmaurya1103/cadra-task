@@ -2,33 +2,74 @@
 from __future__ import annotations
 
 import datetime as dt
-import hashlib
-import re
 import time
 import uuid
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from .data import load_index, norm_email
+from .data import load_index
 from .extract import extract
-from .policy import decide
+from .policy import AUTHORITY_LIMIT, decide
 from .reply import build_reply
 from .trace import build_trace
 from .store import Store, get_store
 
 
-def _fingerprint(ticket: Dict[str, Any], ex: Dict[str, Any], index: Dict[str, Any]) -> str:
-    sender = norm_email(ticket.get("from") or ticket.get("from_"))
-    order = None
-    for candidate in ex.get("order_ids", []):
-        if candidate in index.get("orders", {}):
-            order = candidate
-            break
-    if order is None and ex.get("order_ids"):
-        order = ex["order_ids"][0]
-    body = re.sub(r"\s+", " ", str(ticket.get("body") or "").strip().lower())
-    intent = str(ex.get("ticket_type") or "")
-    raw = f"{sender}|{order}|{body}|{intent}"
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+def _line_amount(item: Dict[str, Any]) -> float:
+    try:
+        return float(item.get("amount") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _apply_active_refunds(
+    decision: Dict[str, Any], store: Optional[Store]
+) -> Tuple[Dict[str, Any], Optional[str]]:
+    """Suppress lines that already have a PROPOSED/APPROVED REFUND in the ledger."""
+    if store is None:
+        return decision, None
+    order_id = (decision.get("resolved") or {}).get("order_id")
+    items = decision.get("_items") or []
+    if not order_id or not items:
+        return decision, None
+
+    active = store.active_refund_lines(order_id)
+    if not active:
+        return decision, None
+
+    covered = [item for item in items if str(item.get("line_no")) in active]
+    if not covered:
+        return decision, None
+
+    remaining = [item for item in items if str(item.get("line_no")) not in active]
+    if not remaining:
+        # Nothing new to propose: point at the run that already holds the refund.
+        run_id = active[str(covered[0].get("line_no"))]
+        decision["duplicate_of"] = run_id
+        decision["_suppress_refund"] = True
+        return decision, run_id
+
+    # Some lines are new: propose only those and re-check authority on the new amount.
+    amount = round(sum(_line_amount(item) for item in remaining), 2)
+    decision["_items"] = remaining
+    decision["amount_usd"] = amount if amount > 0 else None
+    reasons = [
+        code
+        for code in (decision.get("reason_codes") or [])
+        if code != "APPROVAL_REQUIRED"
+    ]
+    if amount > AUTHORITY_LIMIT:
+        decision["outcome"] = "PEND"
+        decision["human_approval_required"] = True
+        decision["approver_role"] = "SUPPORT_LEAD"
+        reasons.append("APPROVAL_REQUIRED")
+    else:
+        decision["human_approval_required"] = False
+        decision["approver_role"] = None
+        if decision.get("outcome") in ("PEND", "PROCEED_MODIFIED"):
+            decision["outcome"] = "PROCEED_MODIFIED"
+    decision["reason_codes"] = list(dict.fromkeys(reasons))
+    decision["duplicate_of"] = None
+    return decision, None
 
 
 def _ledger_action(run: Dict[str, Any]) -> Tuple[Optional[str], Optional[float]]:
@@ -54,6 +95,8 @@ def process_ticket(
     ex = extract(ticket, index)
     decision = decide(ticket, ex, index)
     decision["asks_shipping"] = bool(ex.get("asks_shipping"))
+    if persist and store is not None:
+        decision, _ = _apply_active_refunds(decision, store)
     reply = build_reply(ticket, decision, index)
 
     tools = ["parse_ticket"]
@@ -77,6 +120,7 @@ def process_ticket(
         "run_id": run_id,
         "ticket_type": decision.get("ticket_type") or ex.get("ticket_type") or "OTHER",
         "resolved": decision.get("resolved") or {"order_id": None, "customer_id": None},
+        "resolved_orders": decision.get("resolved_orders"),
         "outcome": decision.get("outcome"),
         "reason_codes": decision.get("reason_codes") or [],
         "checks": decision.get("checks") or [],
@@ -88,24 +132,28 @@ def process_ticket(
         "run_status": "PENDING_APPROVAL"
         if decision.get("human_approval_required")
         else "COMPLETE",
-        "duplicate_of": None,
+        "duplicate_of": decision.get("duplicate_of"),
         "decision": None,
         "latency_ms": None,
     }
     run["latency_ms"] = round((time.perf_counter() - started) * 1000, 2)
 
     if persist and store is not None:
-        fingerprint = _fingerprint(ticket, ex, index)
-        original = store.find_by_fingerprint(fingerprint)
-        if original:
-            # Forwarded duplicate: own run, duplicate_of, no second ledger action.
-            run["duplicate_of"] = original.get("run_id")
-            run["run_status"] = original.get("run_status", "COMPLETE")
-            store.save_run(run, fingerprint, now.isoformat())
-        else:
-            store.save_run(run, fingerprint, now.isoformat())
+        store.save_run(run, "", now.isoformat())
+        if not decision.get("_suppress_refund"):
             action, amount = _ledger_action(run)
             if action:
+                order_id = (run.get("resolved") or {}).get("order_id")
+                lines = []
+                if action == "REFUND":
+                    lines = [
+                        {
+                            "order_id": item.get("order_id") or order_id,
+                            "line_no": str(item.get("line_no")),
+                            "amount": _line_amount(item),
+                        }
+                        for item in (decision.get("_items") or [])
+                    ]
                 store.add_ledger(
                     run_id=run_id,
                     ticket_id=run["ticket_id"],
@@ -113,6 +161,8 @@ def process_ticket(
                     amount_usd=amount,
                     status="PROPOSED",
                     recorded_at=now.isoformat(),
+                    order_id=order_id if action == "REFUND" else None,
+                    lines=lines,
                 )
 
     return run
@@ -145,5 +195,6 @@ def apply_decision(
             "decided_at": now,
         }
         run["run_status"] = status
+        run["human_approval_required"] = False
         store.update_run(run)
     return run

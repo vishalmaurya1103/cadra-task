@@ -25,7 +25,38 @@ INJECTION_PATTERNS = [
     r"issue (?:a )?full refund",
     r"issue (?:a )?refund of",
     r"please action",
+    r"already (?:been )?approved",
+    r"manager (?:already )?approved",
+    r"approved by (?:the )?(?:manager|support lead|supervisor)",
+    r"no need to (?:check|verify|review)",
+    r"(?:do not|don'?t) (?:check|verify|review)",
+    r"skip (?:the )?(?:check|review|policy)",
+    r"no approval (?:is )?needed",
 ]
+
+REQUESTED_AMOUNT_RE = re.compile(
+    r"(?:"
+    r"(?:refund|credit|pay|reimburse|owe|want|expect|entitled(?:\s+to)?)"
+    r"[^0-9$]{0,30}\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)"
+    r"|(?:refund|credit)\s+(?:me|us)\s+\$?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)"
+    r"|(?:refund|credit)\s+of\s+\$?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)"
+    r"|([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*(?:dollars|usd)"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def find_requested_amount(text: str) -> Optional[float]:
+    match = REQUESTED_AMOUNT_RE.search(text or "")
+    if not match:
+        return None
+    for group in match.groups():
+        if group:
+            try:
+                return round(float(group.replace(",", "")), 2)
+            except ValueError:
+                continue
+    return None
 
 STOPWORDS = {
     "the",
@@ -146,7 +177,11 @@ def _classify(text: str, subject: str) -> Dict[str, Any]:
         re.search(r"\brefund(?:ed|s|ing)?\b|\bmoney back\b|\bcredit\b|\brepay|reimburs", lower)
     )
     asks_shipping = bool(
-        re.search(r"\bshipping\b|delivery charge|delivery fee|postage|shipping fee", lower)
+        re.search(
+            r"shipping (?:fee|charge|cost)|delivery (?:charge|fee|cost)|postage|"
+            r"refund (?:the )?shipping|refund (?:the )?delivery",
+            lower,
+        )
     )
     whole_order = bool(
         re.search(
@@ -264,6 +299,7 @@ def _llm_extract(subject: str, body: str) -> Optional[Dict[str, Any]]:
             ],
             temperature=0,
             max_tokens=400,
+            timeout=15,
         )
         content = response.choices[0].message.content or "{}"
         usage = getattr(response, "usage", None)
@@ -304,28 +340,25 @@ def extract(ticket: Dict[str, Any], index: Dict[str, Any]) -> Dict[str, Any]:
             "output_tokens": int(llm.get("output_tokens") or 0),
             "error": llm.get("error"),
         }
-        for raw in data.get("order_ids") or []:
-            for oid in find_order_ids(str(raw)):
-                if oid not in order_ids:
-                    order_ids.append(oid)
+        # Order IDs come from the deterministic regex. Only fall back to the model when
+        # the regex found nothing, so a hallucinated ID cannot change resolution or the
+        # duplicate fingerprint.
+        if not order_ids:
+            for raw in data.get("order_ids") or []:
+                for oid in find_order_ids(str(raw)):
+                    if oid not in order_ids:
+                        order_ids.append(oid)
 
     ticket_type = base["ticket_type"]
     llm_type = str(data.get("ticket_type") or "").upper()
     if ticket_type == "OTHER" and llm_type in TICKET_TYPES:
         ticket_type = llm_type
 
-    def as_bool(key: str) -> bool:
-        return bool(base.get(key)) or bool(data.get(key))
-
-    damage_or_fault = bool(base["damage_or_fault"] or data.get("damage_or_fault"))
-    change_of_mind = bool(base["change_of_mind"] or data.get("change_of_mind"))
-    wrong_or_not_described = bool(
-        base["wrong_or_not_described"]
-        or data.get("wrong_or_not_as_described")
-        or data.get("wrong_or_not_described")
-        or data.get("change_of_mind")
-        or change_of_mind
-    )
+    # Policy-signal flags are deterministic. The model is used for parsing when the
+    # regex has nothing, never to override these signals.
+    damage_or_fault = bool(base["damage_or_fault"])
+    change_of_mind = bool(base["change_of_mind"])
+    wrong_or_not_described = bool(base["wrong_or_not_described"])
 
     candidate_order: Optional[str] = None
     for oid in order_ids:
@@ -379,19 +412,20 @@ def extract(ticket: Dict[str, Any], index: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "order_ids": order_ids,
         "ticket_type": ticket_type,
-        "asks_refund": bool(base["asks_refund"] or data.get("asks_refund")),
-        "asks_return": bool(base["asks_return"] or data.get("asks_return")),
-        "asks_shipping": bool(base["asks_shipping"] or data.get("asks_shipping")),
-        "whole_order": bool(base["whole_order"] or data.get("whole_order")),
+        "asks_refund": bool(base["asks_refund"]),
+        "asks_return": bool(base["asks_return"]),
+        "asks_shipping": bool(base["asks_shipping"]),
+        "whole_order": bool(base["whole_order"]),
         "damage_or_fault": damage_or_fault,
         "wrong_or_not_described": wrong_or_not_described,
         "change_of_mind": change_of_mind,
         "order_status_question": base["order_status_question"],
         "delivery_issue": base["delivery_issue"],
         "photo": image,
-        "injection": bool(injection_matches) or bool(data.get("injection")),
+        "injection": bool(injection_matches),
         "injection_matches": injection_matches,
         "products": products,
+        "requested_amount": find_requested_amount(text),
         "llm_model": (llm or {}).get("model") if llm else None,
         "llm_used": bool(llm and not llm.get("error")),
         "usage": usage,

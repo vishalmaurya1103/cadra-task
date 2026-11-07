@@ -41,14 +41,17 @@ not in the repository. `PORT` is read from the environment.
 - `GET /ledger` -> recorded proposals (`REFUND`, `REPLY`, `ESCALATION`)
 
 Decisions are idempotent: the first decision updates the proposal once; later decisions
-return the same run. Forwarded duplicates get their own `run_id` plus `duplicate_of`, and
-create no second ledger action.
+return the same run. Duplicate detection is ledger-based, not email-text-based: if an order
+line already has a `REFUND` that is `PROPOSED` or `APPROVED`, a new request for that line
+gets its own `run_id` plus `duplicate_of` and creates no second ledger action.
 
 ## Added run fields (allowed by the contract)
 
 - `amount_usd`: proposed refund amount, null when not a refund.
 - `run_status`: `PENDING_APPROVAL`, `COMPLETE`, `APPROVED` or `REJECTED`.
-- `duplicate_of`: original `run_id` for a forwarded duplicate, otherwise null.
+- `resolved_orders`: every referenced order with `matched` true/false (multi-order emails).
+- `duplicate_of`: `run_id` that already holds a `PROPOSED`/`APPROVED` `REFUND` for the
+  same order line, otherwise null.
 - `decision`: `{decision, approver, decided_at}` after a person decides, otherwise null.
 - `latency_ms`: server-side processing latency.
 - `trace.llm_used` / `trace.llm_error`: whether the optional extraction model succeeded.
@@ -64,16 +67,25 @@ per-model OpenAI list-price table in `src/trace.py` using the response's token c
 
 ```bash
 python -m eval.run
+pytest -q
 ```
 
-- Scored set: 15 labelled tickets + new negative cases (`eval/new_negative_cases.json`).
+- Scored set: 15 labelled tickets + 13 new negative cases (`eval/new_negative_cases.json`).
+- `tests/test_regressions.py` covers ledger-based duplicate suppression (original + `Fwd:`
+  copy + `>`-quoted copy = one refund) and the late-status-question `PROCEED` path,
+  including a deliberately misleading LLM response.
 - Pass rule: `outcome`, `human_approval_required`, `approver_role` exact; proposed amount
-  within $0.01 when expected; `reason_codes` is a superset of expected.
+  within $0.01 when expected; `reason_codes` is a superset of expected; `resolved_order_ids`
+  when supplied.
 - `inbox/public_tickets.json` is smoke-checked only and is excluded from the pass rate.
-- Two timestamped result files are committed in `eval/`. The first is the real first run
-  (22/23; N08 failed because a carriage-delivered order claiming non-delivery was wrongly
-  rejected on the window). The change that fixed it was the delivery-status-vs-claim guard;
-  the second run is 23/23.
+- Two timestamped result files are committed in `eval/`:
+  - `results_20261107T124551Z.json` is the real first run on the then-current 23-case set:
+    22/23. N08 failed because a carrier-delivered order claiming non-delivery was wrongly
+    rejected on the window; the delivery-status-vs-claim guard fixed it.
+  - `results_20261107T160411Z.json` is the expanded 28-case run after the reported
+    regression fixes: 28/28. Extra checks cover approve/reject clearing
+    `human_approval_required`, ledger-based duplicate suppression, plain copies,
+    `>`-quoted forwards, same-line suppression and PEND ledger behaviour.
 
 ## Layout
 

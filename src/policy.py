@@ -101,6 +101,10 @@ def decide(ticket: Dict[str, Any], ex: Dict[str, Any], index: Dict[str, Any]) ->
         )
         return result
 
+    referenced_orders = list(dict.fromkeys(ex.get("order_ids", [])))
+    if len(referenced_orders) > 1:
+        return _decide_multi(ticket, ex, index, referenced_orders)
+
     # 4.1 identification.
     _add(
         checks,
@@ -220,6 +224,17 @@ def decide(ticket: Dict[str, Any], ex: Dict[str, Any], index: Dict[str, Any]) ->
         result.update(outcome="UNABLE_TO_VERIFY", reason_codes=[])
         return result
 
+    # Information-only/status requests are answered without a window check.
+    asks_refund = bool(ex.get("asks_refund"))
+    asks_return = bool(ex.get("asks_return"))
+    if not defect and not asks_refund and not asks_return and not ex.get("asks_shipping"):
+        _add(checks, "return_window", "NOT_APPLICABLE", "2.1,2.3,2.6")
+        _add(checks, "affected_quantity", "NOT_APPLICABLE", "2.2,2.5")
+        _add(checks, "prior_refunds", "NOT_APPLICABLE", "2.5")
+        _add(checks, "authority", "NOT_APPLICABLE", "3.1,3.2")
+        result.update(outcome="PROCEED", reason_codes=[], human_approval_required=False, approver_role=None)
+        return result
+
     if days <= ORDINARY_WINDOW_DAYS:
         in_window = True
         window_clause = "2.1"
@@ -260,16 +275,6 @@ def decide(ticket: Dict[str, Any], ex: Dict[str, Any], index: Dict[str, Any]) ->
         )
     else:
         _add(checks, "damage_evidence", "NOT_APPLICABLE", "2.2,2.6")
-
-    # Information-only requests do not need an action.
-    asks_refund = bool(ex.get("asks_refund"))
-    asks_return = bool(ex.get("asks_return"))
-    if not defect and not asks_refund and not asks_return and not ex.get("asks_shipping"):
-        _add(checks, "affected_quantity", "NOT_APPLICABLE", "2.2,2.5")
-        _add(checks, "prior_refunds", "NOT_APPLICABLE", "2.5")
-        _add(checks, "authority", "NOT_APPLICABLE", "3.1,3.2")
-        result.update(outcome="PROCEED", reason_codes=[], human_approval_required=False, approver_role=None)
-        return result
 
     items = index.get("items", {}).get(order_id, [])
     if not items:
@@ -315,10 +320,12 @@ def decide(ticket: Dict[str, Any], ex: Dict[str, Any], index: Dict[str, Any]) ->
         if net > 0:
             payable_items.append(
                 {
+                    "order_id": order_id,
                     "line_no": line["line_no"],
                     "product_name": line["product_name"],
                     "quantity": qty,
                     "unit_price": line["unit_price"],
+                    "amount": net,
                 }
             )
 
@@ -326,6 +333,8 @@ def decide(ticket: Dict[str, Any], ex: Dict[str, Any], index: Dict[str, Any]) ->
     prior_total = round(prior_total, 2)
     result["_items"] = payable_items
     result["_prior_refund_total"] = prior_total
+    requested_amount = float(ex.get("requested_amount") or 0.0)
+    result["_requested_amount"] = requested_amount or None
     result["amount_usd"] = amount if amount > 0 else None
 
     _add(
@@ -381,6 +390,8 @@ def decide(ticket: Dict[str, Any], ex: Dict[str, Any], index: Dict[str, Any]) ->
         modified = True
     if prior_total:
         modified = True
+    if requested_amount and requested_amount > amount + 0.01:
+        modified = True
     if any(qty < int(line.get("qty") or 1) for line, qty in affected):
         modified = True
 
@@ -415,3 +426,137 @@ def decide(ticket: Dict[str, Any], ex: Dict[str, Any], index: Dict[str, Any]) ->
         )
 
     return result
+
+
+def _decide_multi(
+    ticket: Dict[str, Any],
+    ex: Dict[str, Any],
+    index: Dict[str, Any],
+    referenced_orders: List[str],
+) -> Dict[str, Any]:
+    """Evaluate every order referenced in one email and aggregate the proposal."""
+    from .extract import match_products
+
+    text = f"{ticket.get('subject', '')}\n{ticket.get('body', '')}"
+    results: List[Dict[str, Any]] = []
+    resolved_orders: List[Dict[str, Any]] = []
+
+    for oid in referenced_orders:
+        sub_ex = dict(ex)
+        sub_ex["order_ids"] = [oid]
+        items = index.get("items", {}).get(oid, [])
+        sub_ex["products"] = match_products(text, items) if items else []
+        sub = decide(ticket, sub_ex, index)
+        results.append(sub)
+        resolved = sub.get("resolved") or {}
+        resolved_orders.append(
+            {
+                "order_id": oid,
+                "customer_id": resolved.get("customer_id"),
+                "matched": bool(resolved.get("order_id") and resolved.get("customer_id")),
+            }
+        )
+
+    return _multi_result(ticket, ex, results, resolved_orders)
+
+
+def _multi_result(
+    ticket: Dict[str, Any],
+    ex: Dict[str, Any],
+    results: List[Dict[str, Any]],
+    resolved_orders: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    base = _base_result(ticket, ex)
+    valid = [r for r in results if r.get("outcome") != "INVALID_REQUEST"]
+    invalid = [r for r in results if r.get("outcome") == "INVALID_REQUEST"]
+
+    seen = set()
+    checks: List[Dict[str, Any]] = []
+    for result in results:
+        for check in result.get("checks") or []:
+            key = repr(check)
+            if key not in seen:
+                seen.add(key)
+                checks.append(check)
+
+    reasons: List[str] = []
+    for result in results:
+        reasons.extend(result.get("reason_codes") or [])
+    reasons = _dedupe(reasons)
+
+    amount = round(sum(float(r.get("amount_usd") or 0.0) for r in valid), 2)
+    items: List[Dict[str, Any]] = []
+    for result in valid:
+        items.extend(result.get("_items") or [])
+    prior_total = round(sum(float(r.get("_prior_refund_total") or 0.0) for r in valid), 2)
+    requested = round(float(ex.get("requested_amount") or 0.0), 2)
+    matched = next((ro for ro in resolved_orders if ro.get("matched")), None)
+
+    base.update(
+        resolved=(
+            {"order_id": matched["order_id"], "customer_id": matched["customer_id"]}
+            if matched
+            else {"order_id": None, "customer_id": None}
+        ),
+        resolved_orders=resolved_orders,
+        checks=checks,
+        reason_codes=reasons,
+        amount_usd=amount if amount > 0 else None,
+        _items=items,
+        _prior_refund_total=prior_total,
+        _requested_amount=requested or None,
+        _order_ids=[ro["order_id"] for ro in resolved_orders if ro.get("matched")],
+        _shipment=next((r.get("_shipment") for r in valid if r.get("_shipment")), None),
+        _delivered_date=next(
+            (r.get("_delivered_date") for r in valid if r.get("_delivered_date")), None
+        ),
+        _days_since_delivery=next(
+            (r.get("_days_since_delivery") for r in valid if r.get("_days_since_delivery") is not None),
+            None,
+        ),
+    )
+
+    if not valid:
+        base.update(outcome="INVALID_REQUEST", human_approval_required=False, approver_role=None)
+        if not base["reason_codes"]:
+            base["reason_codes"] = ["ORDER_NOT_FOUND"]
+        return base
+
+    escalate_roles = [r.get("approver_role") for r in valid if r.get("outcome") == "ESCALATE"]
+    if escalate_roles:
+        role = "TRUST_SAFETY" if "TRUST_SAFETY" in escalate_roles else "CARRIER_CLAIMS"
+        base.update(outcome="ESCALATE", human_approval_required=True, approver_role=role)
+        return base
+
+    if amount > AUTHORITY_LIMIT:
+        reasons.append("APPROVAL_REQUIRED")
+        base.update(
+            outcome="PEND",
+            human_approval_required=True,
+            approver_role="SUPPORT_LEAD",
+            reason_codes=_dedupe(reasons),
+        )
+        return base
+
+    if amount > 0:
+        modified = bool(invalid) or any(
+            r.get("outcome") == "PROCEED_MODIFIED" for r in valid
+        )
+        base.update(
+            outcome="PROCEED_MODIFIED" if modified else "PROCEED",
+            human_approval_required=False,
+            approver_role=None,
+        )
+        return base
+
+    if any(r.get("outcome") == "PROCEED" for r in valid):
+        base.update(outcome="PROCEED", human_approval_required=False, approver_role=None)
+    elif any(r.get("outcome") == "REJECT" for r in valid):
+        base.update(outcome="REJECT", human_approval_required=False, approver_role=None)
+    else:
+        base.update(
+            outcome=valid[0].get("outcome", "UNABLE_TO_VERIFY"),
+            human_approval_required=False,
+            approver_role=None,
+        )
+    return base
