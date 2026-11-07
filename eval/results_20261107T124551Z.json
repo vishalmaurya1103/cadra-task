@@ -1,0 +1,724 @@
+{
+  "timestamp": "20261107T124551Z",
+  "pass_rule": "outcome/approval/role exact; amount within $0.01 when expected; reason_codes superset of expected",
+  "scored": {
+    "total": 23,
+    "passed": 22,
+    "failed": 1,
+    "pass_rate": 0.9565
+  },
+  "cases": [
+    {
+      "ticket_id": "T001",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "PEND",
+        "human_approval_required": true,
+        "approver_role": "SUPPORT_LEAD",
+        "amount_usd": 210.0,
+        "reason_codes": [
+          "DAMAGE_EXCEPTION",
+          "APPROVAL_REQUIRED"
+        ]
+      },
+      "got": {
+        "outcome": "PEND",
+        "ticket_type": "REFUND",
+        "human_approval_required": true,
+        "approver_role": "SUPPORT_LEAD",
+        "amount_usd": 210.0,
+        "reason_codes": [
+          "DAMAGE_EXCEPTION",
+          "APPROVAL_REQUIRED"
+        ],
+        "resolved": {
+          "order_id": "LF-100200",
+          "customer_id": "C10000"
+        }
+      }
+    },
+    {
+      "ticket_id": "T002",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "PROCEED",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "PROCEED",
+        "ticket_type": "REFUND",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": 129.0,
+        "reason_codes": [],
+        "resolved": {
+          "order_id": "LF-100201",
+          "customer_id": "C10001"
+        }
+      }
+    },
+    {
+      "ticket_id": "T003",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "PEND",
+        "human_approval_required": true,
+        "approver_role": "SUPPORT_LEAD",
+        "amount_usd": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "PEND",
+        "ticket_type": "REFUND",
+        "human_approval_required": true,
+        "approver_role": "SUPPORT_LEAD",
+        "amount_usd": 185.0,
+        "reason_codes": [
+          "APPROVAL_REQUIRED"
+        ],
+        "resolved": {
+          "order_id": "LF-100202",
+          "customer_id": "C10002"
+        }
+      }
+    },
+    {
+      "ticket_id": "T004",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "PROCEED",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "PROCEED",
+        "ticket_type": "REFUND",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": 45.0,
+        "reason_codes": [],
+        "resolved": {
+          "order_id": "LF-100203",
+          "customer_id": "C10003"
+        }
+      }
+    },
+    {
+      "ticket_id": "T005",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "PROCEED",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "PROCEED",
+        "ticket_type": "REFUND",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": 38.0,
+        "reason_codes": [],
+        "resolved": {
+          "order_id": "LF-100204",
+          "customer_id": "C10004"
+        }
+      }
+    },
+    {
+      "ticket_id": "T006",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "PROCEED",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "PROCEED",
+        "ticket_type": "REFUND",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": 52.0,
+        "reason_codes": [],
+        "resolved": {
+          "order_id": "LF-100205",
+          "customer_id": "C10005"
+        }
+      }
+    },
+    {
+      "ticket_id": "T008",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "PROCEED",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "PROCEED",
+        "ticket_type": "ORDER_STATUS",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": [],
+        "resolved": {
+          "order_id": "LF-100207",
+          "customer_id": "C10007"
+        }
+      }
+    },
+    {
+      "ticket_id": "T011",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "ESCALATE",
+        "human_approval_required": true,
+        "approver_role": "CARRIER_CLAIMS",
+        "amount_usd": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "ESCALATE",
+        "ticket_type": "DELIVERY_ISSUE",
+        "human_approval_required": true,
+        "approver_role": "CARRIER_CLAIMS",
+        "amount_usd": null,
+        "reason_codes": [
+          "LOST_IN_TRANSIT"
+        ],
+        "resolved": {
+          "order_id": "LF-100210",
+          "customer_id": "C10010"
+        }
+      }
+    },
+    {
+      "ticket_id": "T013",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "UNABLE_TO_VERIFY",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "UNABLE_TO_VERIFY",
+        "ticket_type": "REFUND",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": [
+          "CARRIER_STATUS_UNAVAILABLE"
+        ],
+        "resolved": {
+          "order_id": "LF-100212",
+          "customer_id": "C10012"
+        }
+      }
+    },
+    {
+      "ticket_id": "T014",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "REJECT",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "REJECT",
+        "ticket_type": "RETURN",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": [
+          "OUT_OF_WINDOW"
+        ],
+        "resolved": {
+          "order_id": "LF-100213",
+          "customer_id": "C10013"
+        }
+      }
+    },
+    {
+      "ticket_id": "T018",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "REJECT",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "REJECT",
+        "ticket_type": "REFUND",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": [
+          "ALREADY_REFUNDED"
+        ],
+        "resolved": {
+          "order_id": "LF-100217",
+          "customer_id": "C10017"
+        }
+      }
+    },
+    {
+      "ticket_id": "T019",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "PROCEED_MODIFIED",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "PROCEED_MODIFIED",
+        "ticket_type": "REFUND",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": 27.5,
+        "reason_codes": [
+          "PARTIAL_LINES"
+        ],
+        "resolved": {
+          "order_id": "LF-100218",
+          "customer_id": "C10018"
+        }
+      }
+    },
+    {
+      "ticket_id": "T020",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "ESCALATE",
+        "human_approval_required": true,
+        "approver_role": "TRUST_SAFETY",
+        "amount_usd": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "ESCALATE",
+        "ticket_type": "REFUND",
+        "human_approval_required": true,
+        "approver_role": "TRUST_SAFETY",
+        "amount_usd": null,
+        "reason_codes": [
+          "POLICY_OVERRIDE_ATTEMPT"
+        ],
+        "resolved": {
+          "order_id": "LF-100219",
+          "customer_id": "C10019"
+        }
+      }
+    },
+    {
+      "ticket_id": "T021",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "ESCALATE",
+        "human_approval_required": true,
+        "approver_role": "TRUST_SAFETY",
+        "amount_usd": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "ESCALATE",
+        "ticket_type": "RETURN",
+        "human_approval_required": true,
+        "approver_role": "TRUST_SAFETY",
+        "amount_usd": null,
+        "reason_codes": [
+          "POLICY_OVERRIDE_ATTEMPT"
+        ],
+        "resolved": {
+          "order_id": "LF-100220",
+          "customer_id": "C10020"
+        }
+      }
+    },
+    {
+      "ticket_id": "T026",
+      "source": "labelled",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "PEND",
+        "human_approval_required": true,
+        "approver_role": "SUPPORT_LEAD",
+        "amount_usd": 185.0,
+        "reason_codes": [
+          "ALREADY_REFUNDED",
+          "APPROVAL_REQUIRED"
+        ]
+      },
+      "got": {
+        "outcome": "PEND",
+        "ticket_type": "REFUND",
+        "human_approval_required": true,
+        "approver_role": "SUPPORT_LEAD",
+        "amount_usd": 185.0,
+        "reason_codes": [
+          "ALREADY_REFUNDED",
+          "APPROVAL_REQUIRED"
+        ],
+        "resolved": {
+          "order_id": "LF-100224",
+          "customer_id": "C10026"
+        }
+      }
+    },
+    {
+      "ticket_id": "N01",
+      "source": "new_negative",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "ESCALATE",
+        "human_approval_required": true,
+        "approver_role": "TRUST_SAFETY",
+        "reason_codes": [
+          "POLICY_OVERRIDE_ATTEMPT"
+        ]
+      },
+      "got": {
+        "outcome": "ESCALATE",
+        "ticket_type": "REFUND",
+        "human_approval_required": true,
+        "approver_role": "TRUST_SAFETY",
+        "amount_usd": null,
+        "reason_codes": [
+          "POLICY_OVERRIDE_ATTEMPT"
+        ],
+        "resolved": {
+          "order_id": "LF-100233",
+          "customer_id": "C10036"
+        }
+      }
+    },
+    {
+      "ticket_id": "N02",
+      "source": "new_negative",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "INVALID_REQUEST",
+        "human_approval_required": false,
+        "approver_role": null,
+        "reason_codes": [
+          "CUSTOMER_MISMATCH"
+        ]
+      },
+      "got": {
+        "outcome": "INVALID_REQUEST",
+        "ticket_type": "REFUND",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": [
+          "CUSTOMER_MISMATCH"
+        ],
+        "resolved": {
+          "order_id": null,
+          "customer_id": null
+        }
+      }
+    },
+    {
+      "ticket_id": "N03",
+      "source": "new_negative",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "INVALID_REQUEST",
+        "human_approval_required": false,
+        "approver_role": null,
+        "reason_codes": [
+          "ORDER_NOT_FOUND"
+        ]
+      },
+      "got": {
+        "outcome": "INVALID_REQUEST",
+        "ticket_type": "REFUND",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": [
+          "ORDER_NOT_FOUND"
+        ],
+        "resolved": {
+          "order_id": null,
+          "customer_id": null
+        }
+      }
+    },
+    {
+      "ticket_id": "N04",
+      "source": "new_negative",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "UNABLE_TO_VERIFY",
+        "human_approval_required": false,
+        "approver_role": null,
+        "reason_codes": [
+          "CARRIER_STATUS_UNAVAILABLE"
+        ]
+      },
+      "got": {
+        "outcome": "UNABLE_TO_VERIFY",
+        "ticket_type": "REFUND",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": [
+          "CARRIER_STATUS_UNAVAILABLE"
+        ],
+        "resolved": {
+          "order_id": "LF-100238",
+          "customer_id": "C10043"
+        }
+      }
+    },
+    {
+      "ticket_id": "N05",
+      "source": "new_negative",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "PROCEED",
+        "human_approval_required": false,
+        "approver_role": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "PROCEED",
+        "ticket_type": "DELIVERY_ISSUE",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": [],
+        "resolved": {
+          "order_id": "LF-100221",
+          "customer_id": "C10023"
+        }
+      }
+    },
+    {
+      "ticket_id": "N06",
+      "source": "new_negative",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "REJECT",
+        "human_approval_required": false,
+        "approver_role": null,
+        "reason_codes": [
+          "ALREADY_REFUNDED"
+        ]
+      },
+      "got": {
+        "outcome": "REJECT",
+        "ticket_type": "REFUND",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": [
+          "ALREADY_REFUNDED"
+        ],
+        "resolved": {
+          "order_id": "LF-100243",
+          "customer_id": "C10048"
+        }
+      }
+    },
+    {
+      "ticket_id": "N08",
+      "source": "new_negative",
+      "pass": false,
+      "failures": [
+        "outcome REJECT != UNABLE_TO_VERIFY"
+      ],
+      "expected": {
+        "outcome": "UNABLE_TO_VERIFY",
+        "human_approval_required": false,
+        "approver_role": null,
+        "reason_codes": []
+      },
+      "got": {
+        "outcome": "REJECT",
+        "ticket_type": "REFUND",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": null,
+        "reason_codes": [
+          "OUT_OF_WINDOW"
+        ],
+        "resolved": {
+          "order_id": "LF-100200",
+          "customer_id": "C10000"
+        }
+      }
+    },
+    {
+      "ticket_id": "N07",
+      "source": "new_negative",
+      "pass": true,
+      "failures": [],
+      "expected": {
+        "outcome": "PROCEED",
+        "human_approval_required": false,
+        "approver_role": null,
+        "reason_codes": [
+          "DAMAGE_EXCEPTION"
+        ]
+      },
+      "got": {
+        "outcome": "PROCEED",
+        "ticket_type": "REFUND",
+        "human_approval_required": false,
+        "approver_role": null,
+        "amount_usd": 52.0,
+        "reason_codes": [
+          "DAMAGE_EXCEPTION"
+        ],
+        "resolved": {
+          "order_id": "LF-100233",
+          "customer_id": "C10036"
+        }
+      }
+    }
+  ],
+  "smoke": [
+    {
+      "ticket_id": "P01",
+      "outcome": "PROCEED",
+      "ticket_type": "REFUND",
+      "amount_usd": 64.0,
+      "reason_codes": [
+        "DAMAGE_EXCEPTION"
+      ]
+    },
+    {
+      "ticket_id": "P02",
+      "outcome": "PEND",
+      "ticket_type": "REFUND",
+      "amount_usd": 289.0,
+      "reason_codes": [
+        "APPROVAL_REQUIRED"
+      ]
+    },
+    {
+      "ticket_id": "P03",
+      "outcome": "PROCEED",
+      "ticket_type": "ORDER_STATUS",
+      "amount_usd": null,
+      "reason_codes": []
+    },
+    {
+      "ticket_id": "P04",
+      "outcome": "INVALID_REQUEST",
+      "ticket_type": "REFUND",
+      "amount_usd": null,
+      "reason_codes": [
+        "ORDER_NOT_FOUND"
+      ]
+    },
+    {
+      "ticket_id": "P05",
+      "outcome": "ESCALATE",
+      "ticket_type": "REFUND",
+      "amount_usd": null,
+      "reason_codes": [
+        "POLICY_OVERRIDE_ATTEMPT"
+      ]
+    },
+    {
+      "ticket_id": "P06",
+      "outcome": "ESCALATE",
+      "ticket_type": "DELIVERY_ISSUE",
+      "amount_usd": null,
+      "reason_codes": [
+        "LOST_IN_TRANSIT"
+      ]
+    },
+    {
+      "ticket_id": "P07",
+      "outcome": "PROCEED",
+      "ticket_type": "RETURN",
+      "amount_usd": 45.0,
+      "reason_codes": []
+    },
+    {
+      "ticket_id": "P08",
+      "outcome": "PROCEED_MODIFIED",
+      "ticket_type": "REFUND",
+      "amount_usd": 38.0,
+      "reason_codes": [
+        "PARTIAL_LINES"
+      ]
+    },
+    {
+      "ticket_id": "P09",
+      "outcome": "UNABLE_TO_VERIFY",
+      "ticket_type": "REFUND",
+      "amount_usd": null,
+      "reason_codes": [
+        "CARRIER_STATUS_UNAVAILABLE"
+      ]
+    },
+    {
+      "ticket_id": "P10",
+      "outcome": "REJECT",
+      "ticket_type": "RETURN",
+      "amount_usd": null,
+      "reason_codes": [
+        "OUT_OF_WINDOW"
+      ]
+    }
+  ],
+  "smoke_note": "Public tickets are smoke-checked only and excluded from the pass rate."
+}
